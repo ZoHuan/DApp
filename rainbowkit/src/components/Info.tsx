@@ -1,11 +1,14 @@
-import { formatUnits, parseUnits } from "viem";
-import { useAccount, useBalance } from "wagmi";
+import { formatUnits, parseUnits } from 'viem';
+import { useAccount, useBalance } from 'wagmi';
 
 const Info = () => {
   const { address } = useAccount();
   const { data, error } = useBalance({ address });
-  const { data: rccTokenData } = useBalance({ address, token: "0x6FCE5Dd421c88B7df4552E037362Bcea35Ae0AcB" });
-  console.log(data, "balance");
+  const { data: rccTokenData } = useBalance({
+    address,
+    token: '0x6FCE5Dd421c88B7df4552E037362Bcea35Ae0AcB',
+  });
+  console.log(data, 'balance');
 
   // parseUnits()
 
