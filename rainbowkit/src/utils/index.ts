@@ -1,4 +1,5 @@
-export const Pid = 0;
+// 测试网 USDC 代币合约地址 (Sepolia)
+export const USDC_CONTRACT_ADDRESS = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238';
 
-export const RccTokenContract = '0x6FCE5Dd421c88B7df4552E037362Bcea35Ae0AcB';
-export const RccStakeContract = '0x6b175474e89094c44da98b954eedeac495271d0f';
+// 收款钱包地址
+export const RECEIVER_ADDRESS = '0xC83D4b94Da121A5d6167C81cB50257529fed2bC8';

@@ -1,14 +1,14 @@
 import { Contract, Signer } from 'ethers';
 import { sepolia } from 'viem/chains';
 
-import { RccStakeContract } from '../utils';
-import { stakeAbi } from '../abis/stakeAbi';
+import { USDC_CONTRACT_ADDRESS } from '../utils';
+import { ERC20_ABI } from '../abis/abi';
 import { useEthersProvider } from './useEthersProvider';
 
-const useStakeContract = (signer?: Signer) => {
+const useUsdcContract = (signer?: Signer) => {
   const provider = useEthersProvider({ chainId: sepolia.id });
   console.log(provider, 'provider');
-  return new Contract(RccStakeContract, stakeAbi, signer || provider);
+  return new Contract(USDC_CONTRACT_ADDRESS, ERC20_ABI, signer || provider);
 };
-// 0x6b175474e89094c44da98b954eedeac495271d0f
-export { useStakeContract };
+
+export { useUsdcContract };

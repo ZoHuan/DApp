@@ -106,7 +106,7 @@
 
 .status-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 15px;
 }
 
@@ -257,4 +257,61 @@
 
 .p-20 {
   padding: 20px;
+}
+
+/* Header组件样式 */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 64px;
+  padding: 0 24px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e8e8e8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(8px);
+}
+
+.header-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1976d2;
+  font-family:
+    'Titillium Web',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  letter-spacing: -0.5px;
+}
+
+.header-nav {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.header-link {
+  text-decoration: none;
+  color: #666666;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  border: 1px solid transparent;
+}
+
+.header-link:hover {
+  background-color: #f0f7ff;
+  color: #1976d2;
+}
+
+.header-link-active {
+  color: #1976d2;
+  font-weight: 600;
+  background-color: #f0f7ff;
+  border: 1px solid #d0e3ff;
 }

@@ -1,18 +1,8 @@
 import { useState, useEffect } from 'react';
 import { BrowserProvider, JsonRpcSigner, Contract, formatEther } from 'ethers';
 import Link from 'next/link';
-
-// 简化的 ERC20 合约 ABI
-const ERC20_ABI = [
-  'function name() view returns (string)',
-  'function symbol() view returns (string)',
-  'function decimals() view returns (uint8)',
-  'function balanceOf(address) view returns (uint256)',
-  'function totalSupply() view returns (uint256)',
-];
-
-// 示例合约地址
-const DAI_CONTRACT_ADDRESS = '0x6b175474e89094c44da98b954eedeac495271d0f';
+import { ERC20_ABI } from '../../../abis/abi';
+import { USDC_CONTRACT_ADDRESS } from '../../../utils';
 
 export default function EthersDemo() {
   const [provider, setProvider] = useState<BrowserProvider | null>(null);
@@ -25,7 +15,7 @@ export default function EthersDemo() {
   const [message, setMessage] = useState<string>('');
   const [network, setNetwork] = useState<string>('');
 
-  // 1. 初始化 Provider
+  // 初始化 Provider
   const initProvider = async () => {
     try {
       if (typeof window !== 'undefined' && window.ethereum) {
@@ -48,7 +38,7 @@ export default function EthersDemo() {
     return null;
   };
 
-  // 2. 连接钱包获取 Signer
+  // 连接钱包获取 Signer
   const connectWallet = async () => {
     try {
       if (!provider) {
@@ -84,10 +74,10 @@ export default function EthersDemo() {
     }
   };
 
-  // 3. 初始化 Contract
+  // 初始化 Contract
   const initContract = async (signerInstance: JsonRpcSigner) => {
     try {
-      const contractInstance = new Contract(DAI_CONTRACT_ADDRESS, ERC20_ABI, signerInstance);
+      const contractInstance = new Contract(USDC_CONTRACT_ADDRESS, ERC20_ABI, signerInstance);
       setContract(contractInstance);
 
       // 获取合约信息
@@ -108,7 +98,7 @@ export default function EthersDemo() {
     }
   };
 
-  // 4. 读取合约数据
+  // 读取合约数据
   const readContractData = async () => {
     if (!contract || !account) {
       setMessage('❌ 请先连接钱包');
@@ -118,14 +108,14 @@ export default function EthersDemo() {
     try {
       setLoading(true);
 
-      // 读取代币余额
+      // 读取 USDC 余额
       const tokenBalance = await contract.balanceOf(account);
       const formattedBalance = formatEther(tokenBalance);
 
-      setMessage(`📊 您的代币余额: ${formattedBalance} ${contractInfo?.symbol}`);
+      setMessage(`📊 您的 USDC 余额: ${formattedBalance} ${contractInfo?.symbol}`);
     } catch (error) {
-      console.error('读取合约数据失败:', error);
-      setMessage('❌ 读取合约数据失败');
+      console.error('读取 USDC 余额失败:', error);
+      setMessage('❌ 读取 USDC 余额失败');
     } finally {
       setLoading(false);
     }
@@ -138,12 +128,6 @@ export default function EthersDemo() {
 
   return (
     <div className='container'>
-      <div className='mb-20'>
-        <Link href='/ethers' style={{ color: '#007bff', textDecoration: 'none' }}>
-          ← 返回 Ethers 主页面
-        </Link>
-      </div>
-
       <h1 className='card-header'>Ethers.js Provider/Signer/Contract 核心功能演示</h1>
 
       {/* 状态面板 */}
