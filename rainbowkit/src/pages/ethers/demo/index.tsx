@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { BrowserProvider, JsonRpcSigner, Contract, formatEther } from 'ethers';
-import Link from 'next/link';
 import { ERC20_ABI } from '../../../abis/abi';
 import { USDC_CONTRACT_ADDRESS } from '../../../utils';
+import { useTransactionStatus } from '../../../hooks/useTransactionStatus';
 
-export default function EthersDemo() {
+export default function EthersDemoPage() {
   const [provider, setProvider] = useState<BrowserProvider | null>(null);
   const [signer, setSigner] = useState<JsonRpcSigner | null>(null);
   const [contract, setContract] = useState<Contract | null>(null);
@@ -12,8 +12,9 @@ export default function EthersDemo() {
   const [balance, setBalance] = useState<string>('0');
   const [contractInfo, setContractInfo] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const [message, setMessage] = useState<string>('');
   const [network, setNetwork] = useState<string>('');
+
+  const { status, updateStatus } = useTransactionStatus();
 
   // 初始化 Provider
   const initProvider = async () => {
@@ -21,19 +22,29 @@ export default function EthersDemo() {
       if (typeof window !== 'undefined' && window.ethereum) {
         const web3Provider = new BrowserProvider(window.ethereum);
         setProvider(web3Provider);
-        setMessage('✅ Provider 初始化成功');
 
         // 获取网络信息
         const networkInfo = await web3Provider.getNetwork();
         setNetwork(networkInfo.name);
 
+        updateStatus({
+          type: 'success',
+          message: '✅ Provider 初始化成功',
+        });
+
         return web3Provider;
       } else {
-        setMessage('❌ 请安装 MetaMask 或其他以太坊钱包');
+        updateStatus({
+          type: 'error',
+          message: '❌ 请安装 MetaMask 或其他以太坊钱包',
+        });
       }
     } catch (error) {
       console.error('初始化 Provider 失败:', error);
-      setMessage('❌ 初始化 Provider 失败');
+      updateStatus({
+        type: 'error',
+        message: '❌ 初始化 Provider 失败',
+      });
     }
     return null;
   };
@@ -42,11 +53,18 @@ export default function EthersDemo() {
   const connectWallet = async () => {
     try {
       if (!provider) {
-        setMessage('❌ 请先初始化 Provider');
+        updateStatus({
+          type: 'error',
+          message: '❌ 请先初始化 Provider',
+        });
         return;
       }
 
       setLoading(true);
+      updateStatus({
+        type: 'loading',
+        message: '⏳ 连接钱包中...',
+      });
 
       // 请求账户连接
       await window.ethereum.request({ method: 'eth_requestAccounts' });
@@ -58,7 +76,6 @@ export default function EthersDemo() {
       // 获取账户地址
       const address = await signerInstance.getAddress();
       setAccount(address);
-      setMessage(`✅ 钱包连接成功: ${address.substring(0, 8)}...`);
 
       // 获取余额
       const balanceWei = await provider.getBalance(address);
@@ -66,9 +83,17 @@ export default function EthersDemo() {
 
       // 初始化合约
       await initContract(signerInstance);
+
+      updateStatus({
+        type: 'success',
+        message: `✅ 钱包连接成功: ${address.substring(0, 8)}...`,
+      });
     } catch (error) {
       console.error('连接钱包失败:', error);
-      setMessage('❌ 连接钱包失败');
+      updateStatus({
+        type: 'error',
+        message: '❌ 连接钱包失败',
+      });
     } finally {
       setLoading(false);
     }
@@ -91,33 +116,67 @@ export default function EthersDemo() {
         decimals: decimals.toString(),
       });
 
-      setMessage(`✅ 合约 ${name} (${symbol}) 初始化成功`);
+      updateStatus({
+        type: 'success',
+        message: `✅ 合约 ${name} (${symbol}) 初始化成功`,
+      });
     } catch (error) {
       console.error('初始化合约失败:', error);
-      setMessage('❌ 初始化合约失败 - 请检查网络和合约地址');
+      updateStatus({
+        type: 'error',
+        message: '❌ 初始化合约失败 - 请检查网络和合约地址',
+      });
     }
   };
 
   // 读取合约数据
   const readContractData = async () => {
     if (!contract || !account) {
-      setMessage('❌ 请先连接钱包');
+      updateStatus({
+        type: 'error',
+        message: '❌ 请先连接钱包',
+      });
       return;
     }
 
     try {
       setLoading(true);
+      updateStatus({
+        type: 'loading',
+        message: '⏳ 读取合约数据中...',
+      });
 
       // 读取 USDC 余额
       const tokenBalance = await contract.balanceOf(account);
       const formattedBalance = formatEther(tokenBalance);
 
-      setMessage(`📊 您的 USDC 余额: ${formattedBalance} ${contractInfo?.symbol}`);
+      updateStatus({
+        type: 'success',
+        message: `📊 您的 USDC 余额: ${formattedBalance} ${contractInfo?.symbol}`,
+      });
     } catch (error) {
       console.error('读取 USDC 余额失败:', error);
-      setMessage('❌ 读取 USDC 余额失败');
+      updateStatus({
+        type: 'error',
+        message: '❌ 读取 USDC 余额失败',
+      });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 根据状态类型获取对应的CSS类名
+  const getStatusClassName = (type: string) => {
+    switch (type) {
+      case 'success':
+        return 'message-success';
+      case 'error':
+        return 'message-error';
+      case 'loading':
+      case 'info':
+        return 'message-info';
+      default:
+        return 'message-info';
     }
   };
 
@@ -196,10 +255,11 @@ export default function EthersDemo() {
         </button>
       </div>
 
-      {/* 消息显示 */}
-      {message && (
-        <div className={`message ${message.includes('❌') ? 'message-error' : 'message-success'}`}>
-          {message}
+      {/* 交易状态显示 */}
+      {status.type !== 'none' && (
+        <div className='status-panel mb-20'>
+          <h3 className='text-muted mb-20'>📊 交易状态</h3>
+          <div className={`message ${getStatusClassName(status.type)}`}>{status.message}</div>
         </div>
       )}
     </div>

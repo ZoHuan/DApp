@@ -11,14 +11,26 @@ import {
 } from 'wagmi';
 import { ERC20_ABI } from '../../abis/abi';
 import { USDC_CONTRACT_ADDRESS, RECEIVER_ADDRESS } from '../../utils';
+import { useTransactionStatus } from '../../hooks/useTransactionStatus';
 
-export default function Page() {
-  const [loading, setLoading] = useState(false);
+export default function WagmiPage() {
+  const account = useAccount();
+
+  const [isUsdcTransferring, setIsUsdcTransferring] = useState(false);
   const [tokenInfo, setTokenInfo] = useState<any>(null);
   const [signature, setSignature] = useState('');
-  const [ethTransferSending, setEthTransferSending] = useState(false);
+  const [isEthTransferring, setIsEthTransferring] = useState(false);
 
-  const account = useAccount();
+  const {
+    status: usdcStatus,
+    updateStatus: updateUsdcStatus,
+    reset: resetUsdcStatus,
+  } = useTransactionStatus();
+  const {
+    status: ethStatus,
+    updateStatus: updateEthStatus,
+    reset: resetEthStatus,
+  } = useTransactionStatus();
 
   // 代币信息查询
   const tokenInfoQuery = useReadContracts({
@@ -57,19 +69,27 @@ export default function Page() {
 
   // USDC转账
   const { writeContractAsync, data: usdcTxHash } = useWriteContract();
-  const {
-    status: usdcTxStatus,
-    isSuccess: usdcTxIsSuccess,
-    isError: usdcTxIsError,
-    isLoading: usdcTxIsLoading,
-  } = useWaitForTransactionReceipt({
+  const { status: usdcTxStatus } = useWaitForTransactionReceipt({
     hash: usdcTxHash,
   });
 
+  // ETH转账
+  const { sendTransaction, data: ethTxHash } = useSendTransaction();
+  const { status: ethTxStatus } = useWaitForTransactionReceipt({
+    hash: ethTxHash,
+  });
+
+  // 消息签名Hook
+  const { signMessageAsync } = useSignMessage();
+
   // USDC转账处理函数
   const handleUsdcTransfer = async () => {
+    if (!account.isConnected) return;
+
     try {
-      setLoading(true);
+      setIsUsdcTransferring(true);
+      updateUsdcStatus({ type: 'loading', message: '⏳ USDC转账处理中...' });
+
       const hash = await writeContractAsync({
         abi: ERC20_ABI,
         address: USDC_CONTRACT_ADDRESS,
@@ -79,14 +99,32 @@ export default function Page() {
       console.log('USDC转账哈希:', hash);
     } catch (error) {
       console.error('USDC转账失败:', error);
+      updateUsdcStatus({
+        type: 'error',
+        message: `❌ USDC转账失败: ${error instanceof Error ? error.message : '未知错误'}`,
+      });
+    } finally {
+      setIsUsdcTransferring(false);
     }
-    setLoading(false);
   };
-  // 消息签名功能
-  const { signMessageAsync } = useSignMessage();
+
+  // ETH转账处理函数
+  const handleEthTransfer = () => {
+    if (!account.isConnected) return;
+
+    setIsEthTransferring(true);
+    updateEthStatus({ type: 'loading', message: '⏳ ETH转账发送中...' });
+
+    sendTransaction({
+      to: RECEIVER_ADDRESS,
+      value: parseEther('0.001'),
+    });
+  };
 
   // 消息签名处理
   const handleSign = async () => {
+    if (!account.isConnected) return;
+
     try {
       const sig = await signMessageAsync({ message: 'hello world' });
       console.log('签名结果:', sig);
@@ -94,26 +132,6 @@ export default function Page() {
     } catch (error) {
       console.error('签名失败:', error);
     }
-  };
-
-  // ETH转账
-  const { sendTransaction, data: ethTxHash } = useSendTransaction();
-  const {
-    status: ethTxStatus,
-    isSuccess: ethTxIsSuccess,
-    isError: ethTxIsError,
-    isLoading: ethTxIsLoading,
-  } = useWaitForTransactionReceipt({
-    hash: ethTxHash,
-  });
-
-  // ETH转账处理函数
-  const handleEthTransfer = () => {
-    setEthTransferSending(true);
-    sendTransaction({
-      to: RECEIVER_ADDRESS,
-      value: parseEther('0.001'),
-    });
   };
 
   // 更新代币信息
@@ -131,35 +149,57 @@ export default function Page() {
     }
   }, [tokenInfoQuery.data]);
 
-  // 获取USDC转账状态文本
-  const getUsdcStatusText = () => {
-    if (usdcTxIsLoading) return '⏳ USDC转账处理中...';
-    if (usdcTxIsSuccess) return '✅ USDC转账成功';
-    if (usdcTxIsError) return '❌ USDC转账失败';
-    return '';
-  };
+  // 监听USDC交易状态变化
+  useEffect(() => {
+    if (isUsdcTransferring && usdcTxStatus === 'pending') {
+      updateUsdcStatus({ type: 'loading', message: '⏳ USDC转账处理中...' });
+    } else if (usdcTxStatus === 'success') {
+      updateUsdcStatus({ type: 'success', message: '✅ USDC转账成功' });
+      setIsUsdcTransferring(false);
+    } else if (usdcTxStatus === 'error') {
+      updateUsdcStatus({ type: 'error', message: '❌ USDC转账失败' });
+      setIsUsdcTransferring(false);
+    }
+  }, [isUsdcTransferring, usdcTxStatus, updateUsdcStatus]);
 
-  // 获取ETH转账状态文本
-  const getEthStatusText = () => {
-    if (ethTransferSending && ethTxIsLoading) return '⏳ ETH转账处理中...';
-    if (ethTxIsSuccess) return '✅ ETH转账成功';
-    if (ethTxIsError) return '❌ ETH转账失败';
-    if (ethTransferSending) return '⏳ ETH转账发送中...';
-    return '';
-  };
+  // 监听ETH交易状态变化
+  useEffect(() => {
+    if (isEthTransferring && ethTxStatus === 'pending') {
+      updateEthStatus({ type: 'loading', message: '⏳ ETH转账处理中...' });
+    } else if (ethTxStatus === 'success') {
+      updateEthStatus({ type: 'success', message: '✅ ETH转账成功' });
+      setIsEthTransferring(false);
+    } else if (ethTxStatus === 'error') {
+      updateEthStatus({ type: 'error', message: '❌ ETH转账失败' });
+      setIsEthTransferring(false);
+    }
+  }, [isEthTransferring, ethTxStatus, updateEthStatus]);
 
   // 获取USDC按钮文本
   const getUsdcButtonText = () => {
-    if (loading) return '⏳ 转账中...';
-    if (usdcTxIsLoading) return '⏳ 处理中...';
+    if (isUsdcTransferring) return '⏳ 转账中...';
     return '💸 转账 1 USDC';
   };
 
   // 获取ETH按钮文本
   const getEthButtonText = () => {
-    if (ethTransferSending) return '⏳ 发送中...';
-    if (ethTxIsLoading) return '⏳ 处理中...';
+    if (isEthTransferring) return '⏳ 发送中...';
     return '🌟 转账 0.001 ETH';
+  };
+
+  // 根据状态类型获取对应的CSS类名
+  const getStatusClassName = (type: string) => {
+    switch (type) {
+      case 'success':
+        return 'message-success';
+      case 'error':
+        return 'message-error';
+      case 'loading':
+      case 'info':
+        return 'message-info';
+      default:
+        return 'message-info';
+    }
   };
 
   return (
@@ -234,7 +274,7 @@ export default function Page() {
         {/* USDC转账按钮 */}
         <button
           onClick={handleUsdcTransfer}
-          disabled={loading || usdcTxIsLoading || !account.isConnected}
+          disabled={isUsdcTransferring || usdcStatus.type === 'loading' || !account.isConnected}
           className='btn btn-primary'
         >
           {getUsdcButtonText()}
@@ -247,44 +287,35 @@ export default function Page() {
         {/* ETH转账按钮 */}
         <button
           onClick={handleEthTransfer}
-          disabled={ethTransferSending || ethTxIsLoading || !account.isConnected}
+          disabled={isEthTransferring || ethStatus.type === 'loading' || !account.isConnected}
           className='btn btn-success'
         >
           {getEthButtonText()}
         </button>
       </div>
 
-      {/* 统一交易状态显示 */}
-      <div className='status-panel mb-20'>
-        <h3 className='text-muted mb-20'>📈 交易状态</h3>
-
-        {/* USDC交易状态 */}
-        {getUsdcStatusText() && (
-          <div
-            className={`message ${
-              usdcTxIsSuccess ? 'message-success' : usdcTxIsError ? 'message-error' : 'message-info'
-            }`}
-          >
-            {getUsdcStatusText()}
+      {/* USDC交易状态 */}
+      {usdcStatus.type !== 'none' && (
+        <div className='status-panel mb-20'>
+          <h3 className='text-muted mb-20'>💵 USDC交易状态</h3>
+          <div className={`message ${getStatusClassName(usdcStatus.type)}`}>
+            {usdcStatus.message}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ETH交易状态 */}
-        {getEthStatusText() && (
-          <div
-            className={`message ${
-              ethTxIsSuccess ? 'message-success' : ethTxIsError ? 'message-error' : 'message-info'
-            }`}
-          >
-            {getEthStatusText()}
-          </div>
-        )}
-      </div>
+      {/* ETH交易状态 */}
+      {ethStatus.type !== 'none' && (
+        <div className='status-panel mb-20'>
+          <h3 className='text-muted mb-20'>💰 ETH交易状态</h3>
+          <div className={`message ${getStatusClassName(ethStatus.type)}`}>{ethStatus.message}</div>
+        </div>
+      )}
 
       {/* 签名结果 */}
       {signature && (
         <div className='status-panel mb-20'>
-          <h3 className='text-muted mb-20'>🔐 签名结果</h3>
+          <h3 className='text-muted mb-20'>🔏 签名结果</h3>
           <div className='message message-info' style={{ wordBreak: 'break-all' }}>
             <strong>📄 签名内容:</strong> "hello world"
             <br />

@@ -8,6 +8,7 @@ const Header = () => {
     { href: '/', label: '首页' },
     { href: '/wagmi', label: 'Wagmi' },
     { href: '/ethers', label: 'Ethers' },
+    { href: '/viem', label: 'Viem' },
   ];
 
   return (

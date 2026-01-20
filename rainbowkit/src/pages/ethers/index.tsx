@@ -4,21 +4,24 @@ import { sepolia } from 'viem/chains';
 import Link from 'next/link';
 import { useEthersSigner } from '../../hooks/useEthersSigner';
 import { useUsdcContract } from '../../hooks/useContract';
+import { useTransactionStatus } from '../../hooks/useTransactionStatus';
 import { RECEIVER_ADDRESS, USDC_CONTRACT_ADDRESS } from '../../utils';
 
-export default function Page() {
-  const [balance, setBalance] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [transferStatus, setTransferStatus] = useState('');
-  const [tokenInfo, setTokenInfo] = useState({ name: '', symbol: '', decimals: 0 });
-
+export default function EthersPage() {
   const signer = useEthersSigner({ chainId: sepolia.id });
   const usdcContract = useUsdcContract(signer);
+  const { status, updateStatus } = useTransactionStatus();
+
+  const [balance, setBalance] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [tokenInfo, setTokenInfo] = useState({ name: '', symbol: '', decimals: 0 });
 
   const handleTransfer = async () => {
+    if (!signer) return;
+
     try {
       setLoading(true);
-      setTransferStatus('发送中...');
+      updateStatus({ type: 'loading', message: '⏳ USDC转账发送中...' });
 
       // 转账 1 USDC 到指定地址
       const tx = await usdcContract.transfer(
@@ -27,14 +30,17 @@ export default function Page() {
       );
 
       if (tx.wait) {
-        setTransferStatus('处理中...');
+        updateStatus({ type: 'loading', message: '⏳ USDC转账处理中...' });
         const res = await tx.wait();
-        console.log(res, 'transfer');
-        setTransferStatus('转账成功');
+        console.log('USDC转账结果:', res);
+        updateStatus({ type: 'success', message: '✅ USDC转账成功' });
       }
     } catch (error) {
-      console.error('转账失败:', error);
-      setTransferStatus('转账失败');
+      console.error('USDC转账失败:', error);
+      updateStatus({
+        type: 'error',
+        message: `❌ USDC转账失败: ${error instanceof Error ? error.message : '未知错误'}`,
+      });
     } finally {
       setLoading(false);
     }
@@ -43,41 +49,51 @@ export default function Page() {
   useEffect(() => {
     const getTokenInfo = async () => {
       try {
-        if (usdcContract) {
-          // 获取代币信息
+        if (usdcContract && signer) {
           const [name, symbol, decimals, balance] = await Promise.all([
             usdcContract.name(),
             usdcContract.symbol(),
             usdcContract.decimals(),
-            signer ? usdcContract.balanceOf(signer.getAddress()) : '0',
+            usdcContract.balanceOf(signer.getAddress()),
           ]);
 
-          setTokenInfo({ name, symbol, decimals });
-          setBalance(balance.toString());
+          // 只在数据真正变化时更新状态
+          setTokenInfo((prev) =>
+            prev.name === name && prev.symbol === symbol && prev.decimals === decimals
+              ? prev
+              : { name, symbol, decimals },
+          );
+          setBalance((prev) => (prev === balance.toString() ? prev : balance.toString()));
         }
       } catch (error) {
         console.error('获取代币信息失败:', error);
       }
     };
 
-    if (usdcContract) {
+    if (usdcContract && signer) {
       getTokenInfo();
     }
-  }, [usdcContract, signer]);
-
-  // 获取转账状态文本
-  const getTransferStatusText = () => {
-    if (transferStatus === '转账成功') return '✅ 转账成功';
-    if (transferStatus === '转账失败') return '❌ 转账失败';
-    if (transferStatus === '处理中...') return '⏳ 转账处理中...';
-    if (transferStatus === '发送中...') return '⏳ 转账发送中...';
-    return '';
-  };
+  }, [usdcContract?.address, signer?.address]);
 
   // 获取按钮文本
   const getButtonText = () => {
     if (loading) return '⏳ 转账中...';
     return '💸 转账 1 USDC';
+  };
+
+  // 根据状态类型获取对应的CSS类名
+  const getStatusClassName = (type: string) => {
+    switch (type) {
+      case 'success':
+        return 'message-success';
+      case 'error':
+        return 'message-error';
+      case 'loading':
+      case 'info':
+        return 'message-info';
+      default:
+        return 'message-info';
+    }
   };
 
   return (
@@ -128,29 +144,21 @@ export default function Page() {
 
       {/* 操作面板 */}
       <div className='flex mb-20'>
-        <button onClick={handleTransfer} disabled={loading || !signer} className='btn btn-primary'>
+        <button
+          onClick={handleTransfer}
+          disabled={loading || status.type === 'loading' || !signer}
+          className='btn btn-primary'
+        >
           {getButtonText()}
         </button>
       </div>
 
-      <div className='status-panel mb-20'>
-        <h3 className='text-muted mb-20'>📈 交易状态</h3>
-
-        {/* 转账状态显示 */}
-        {getTransferStatusText() && (
-          <div
-            className={`message ${
-              transferStatus === '转账成功'
-                ? 'message-success'
-                : transferStatus === '转账失败'
-                  ? 'message-error'
-                  : 'message-info'
-            }`}
-          >
-            {getTransferStatusText()}
-          </div>
-        )}
-      </div>
+      {status.type !== 'none' && (
+        <div className='status-panel mb-20'>
+          <h3 className='text-muted mb-20'>📈 交易状态</h3>
+          <div className={`message ${getStatusClassName(status.type)}`}>{status.message}</div>
+        </div>
+      )}
     </div>
   );
 }
